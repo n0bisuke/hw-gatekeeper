@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "local": "node --env-file=.env index.js",
+    "ci": "GITHUB_ACTIONS=true node --env-file=.env index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

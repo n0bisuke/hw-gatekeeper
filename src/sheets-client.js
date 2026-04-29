@@ -15,7 +15,7 @@ class SheetsClient {
   async getSettings(spreadsheetId) {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: '設定!A2:J100',
+      range: '設定!A2:K100',
     });
     const rows = res.data.values || [];
     return rows.map((r) => ({
@@ -27,8 +27,9 @@ class SheetsClient {
       discordWebhook: r[5]?.trim(),
       discordThread: r[6]?.trim(),
       teamsWebhook: r[7]?.trim(),
-      notes: r[8]?.trim(),
+      quietHours: r[8]?.trim(),
       operationLimit: r[9]?.trim(),
+      notes: r[10]?.trim(),
     }));
   }
 
@@ -49,21 +50,31 @@ class SheetsClient {
   }
 
   async appendLog(spreadsheetId, entry) {
+    const studentId = [entry.studentName, entry.homeworkId].filter(Boolean).join('_');
     await this.sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'ログ!A:F',
+      range: 'ログ!A:G',
       valueInputOption: 'RAW',
       requestBody: {
         values: [[
+          studentId,
           this._now(),
           entry.targetId,
           entry.title,
-          entry.weekNumber,
-          entry.result,    // 受理 / 却下
-          entry.reason,    // 不備内容 or 正常
+          entry.result,
+          entry.reason,
+          entry.notionUrl || '',
         ]],
       },
     });
+  }
+
+  async getRecentLogs(spreadsheetId) {
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'ログ!A:G',
+    });
+    return (res.data.values || []).slice(1); // ヘッダー行を除く
   }
 
   async appendFeedback(spreadsheetId, week, notionUrl) {

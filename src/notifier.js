@@ -8,21 +8,38 @@ class Notifier {
   }
 
   async sendAccepted(result, setting) {
-    const message = `✅ **受理: ${result.title}**\n\n` +
-      `Notion: ${result.notionUrl}\n` +
-      `提出週: 第${result.weekNumber}週\n` +
-      `受理時刻: ${new Date().toLocaleString('ja-JP')}`;
+    const lines = [
+      `✅ **受理: ${result.title}**`,
+      '',
+      `学生: ${result.studentName || '(不明)'}`,
+      `課題: ${result.homeworkId || '(不明)'}`,
+      `Notion: ${result.notionUrl}`,
+      `提出週: 第${result.weekNumber}週`,
+    ];
+    if (result.doUrl) lines.push(`Do: ${result.doUrl}`);
+    lines.push(`受理時刻: ${new Date().toLocaleString('ja-JP')}`);
+    const message = lines.join('\n');
 
     await this._notify(message, setting);
   }
 
   async sendRejected(result, setting, reasons) {
     const reasonText = Array.isArray(reasons) ? reasons.join('\n') : reasons;
-    const message = `❌ **却下: ${result.title}**\n\n` +
-      `Notion: ${result.notionUrl}\n` +
-      `提出週: 第${result.weekNumber}週\n` +
-      `却下理由:\n${reasonText}\n\n` +
-      `却下時刻: ${new Date().toLocaleString('ja-JP')}`;
+    const lines = [
+      `❌ **却下: ${result.title}**`,
+      '',
+      `学生: ${result.studentName || '(不明)'}`,
+      `課題: ${result.homeworkId || '(不明)'}`,
+      `Notion: ${result.notionUrl}`,
+      `提出週: 第${result.weekNumber}週`,
+    ];
+    if (result.doUrl) lines.push(`Do: ${result.doUrl}`);
+    if (result.plan && reasonText.includes('Plan')) {
+      lines.push(`Plan内容:\n${result.plan}`);
+    }
+    lines.push(`却下理由:\n${reasonText}`);
+    lines.push(`却下時刻: ${new Date().toLocaleString('ja-JP')}`);
+    const message = lines.join('\n');
 
     await this._notify(message, setting);
   }
@@ -42,7 +59,13 @@ class Notifier {
 
   _sendDiscord(content, webhookUrl, threadUrl) {
     return new Promise((resolve, reject) => {
-      const url = threadUrl || webhookUrl;
+      // threadUrlが/channels/形式の場合、そこからthread_idを抽出
+      let url = webhookUrl;
+      if (threadUrl) {
+        const threadMatch = threadUrl.match(/\/channels\/\d+\/(\d+)/);
+        const threadId = threadMatch ? threadMatch[1] : threadUrl;
+        url = webhookUrl + (webhookUrl.includes('?') ? '&' : '?') + 'thread_id=' + threadId;
+      }
       const body = JSON.stringify({ content });
       const parsed = new URL(url);
       const options = {
@@ -58,7 +81,14 @@ class Notifier {
       const req = (parsed.protocol === 'https:' ? https : http).request(options, (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => resolve(data));
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 400) {
+            console.warn(`Discord送信失敗 (${res.statusCode}):`, data?.substring(0, 100));
+          } else {
+            console.log(`Discord通知送信済 (${res.statusCode})`);
+          }
+          resolve(data);
+        });
       });
 
       req.on('error', reject);
@@ -88,7 +118,14 @@ class Notifier {
       const req = (parsed.protocol === 'https:' ? https : http).request(options, (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => resolve(data));
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 400) {
+            console.warn(`Teams送信失敗 (${res.statusCode}):`, data?.substring(0, 100));
+          } else {
+            console.log(`Teams通知送信済 (${res.statusCode})`);
+          }
+          resolve(data);
+        });
       });
 
       req.on('error', reject);

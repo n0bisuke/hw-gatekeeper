@@ -50,6 +50,10 @@ class NotionClient {
         return prop.url || '';
       case 'select':
         return prop.select?.name || '';
+      case 'formula':
+        if (prop.formula.type === 'string') return prop.formula.string || '';
+        if (prop.formula.type === 'number') return String(prop.formula.number ?? '');
+        return '';
       default:
         return null;
     }

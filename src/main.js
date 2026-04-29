@@ -5,10 +5,34 @@ const Scheduler = require('./scheduler');
 const Validator = require('./validator');
 const Notifier = require('./notifier');
 
-// CI（GitHub Actions）上では学生名などの個人情報をマスク
-function displayTitle(title) {
-  if (!config.IS_CI) return title;
-  return (title || '').split('_')[0] || title;
+// CI（GitHub Actions）上では個人情報・内部IDをマスク
+function mask(val) {
+  if (!config.IS_CI || !val) return val;
+  return '***';
+}
+
+// 非通知時間チェック（JST）。format: "0:30-9:00"
+function isInQuietHours(rangeStr) {
+  if (!rangeStr) return false;
+  const [startStr, endStr] = rangeStr.split('-').map((s) => s.trim());
+  if (!startStr || !endStr) return false;
+  const [sh, sm] = startStr.split(':').map(Number);
+  const [eh, em] = endStr.split(':').map(Number);
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return false;
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  const now = new Date();
+  const jstMin = now.getUTCHours() * 60 + now.getUTCMinutes() + 9 * 60; // JST = UTC+9
+  const curMin = jstMin % (24 * 60);
+  if (startMin <= endMin) {
+    return curMin >= startMin && curMin < endMin;
+  }
+  // 日付をまたぐ場合（例: 22:00-6:00）
+  return curMin >= startMin || curMin < endMin;
+}
+
+function makeStudentId(result) {
+  return [result.studentName, result.homeworkId].filter(Boolean).join('_');
 }
 
 async function main() {
@@ -29,7 +53,7 @@ async function main() {
   }
 
   const targetIds = settings.map((s) => s.targetId);
-  console.log(`監視対象ターゲット: ${targetIds.join(', ')}`);
+  console.log(`監視対象ターゲット: ${mask(targetIds.join(', '))}`);
   console.log(`(${settings.length}件中、稼働リミット切れを除外します)`);
 
   const now = new Date();
@@ -44,7 +68,7 @@ async function main() {
     console.log('有効なターゲットがありません。処理を終了します。');
     return;
   }
-  console.log(`有効ターゲット: ${activeTargetIds.join(', ')}`);
+  console.log(`有効ターゲット: ${mask(activeTargetIds.join(', '))}`);
 
   // 2. 該当ターゲットIDの提出のみをNotionから取得
   console.log('Notionから提出済みデータを取得中...');
@@ -64,7 +88,20 @@ async function main() {
   }
   const scheduler = new Scheduler(settings, schedule);
 
-  // 3. 1件ずつ処理
+  // 3. 重複判定のため既存ログを読み込む
+  let existingLogs = [];
+  try {
+    existingLogs = await sheets.getRecentLogs(config.MANAGEMENT_SPREADSHEET_ID);
+  } catch (e) {
+    console.log('ログ読み込み失敗（重複チェックなしで続行）:', e.message?.substring(0, 80));
+  }
+
+  const quietActive = activeSettings.some((s) => isInQuietHours(s.quietHours));
+  if (quietActive) {
+    console.log('非通知時間中です。通知をスキップします。');
+  }
+
+  // 4. 1件ずつ処理
   for (const page of submissions) {
     const title = notion.getPropertyValue(page, 'title', 'title') ||
                   notion.getPropertyValue(page, 'タイトル', 'title') ||
@@ -78,15 +115,15 @@ async function main() {
     // 週番号を抽出
     const weekNumber = notion.extractWeekNumber(title, setting.targetId);
     if (!weekNumber) {
-      console.log(`週番号抽出失敗: ${displayTitle(title)} — スキップ`);
+      console.log(`週番号抽出失敗: ${mask(title)} — スキップ`);
       continue;
     }
 
-    console.log(`\n--- ${displayTitle(title)} (${setting.targetId}, 第${weekNumber}週) ---`);
+    console.log(`\n--- ${mask(title)} (${mask(setting.targetId)}, 第${mask(String(weekNumber))}週) ---`);
 
     // バリデーション
     const validator = new Validator(notion);
-    const result = validator.validate(page);
+    const result = await validator.validate(page);
     const errors = [...(result.errors || [])];
 
     // 窓口判定（教育運営シートがある場合のみ）
@@ -97,6 +134,21 @@ async function main() {
       }
     }
 
+    const studentId = makeStudentId(result);
+    const reasonStr = errors.length > 0 ? errors.join('; ') : '正常';
+
+    // 重複チェック: 同じID + 同じ理由のログが既にあるか
+    const isDuplicate = existingLogs.some((row) => {
+      return row[0] === studentId && row[5] === reasonStr;
+    });
+    if (isDuplicate) {
+      console.log(`→ スキップ: 同一内容が既に記録済みです`);
+      continue;
+    }
+
+    // 非通知時間なら通知しない（ログは残す）
+    const skipNotify = quietActive || isInQuietHours(setting.quietHours);
+
     const notifier = new Notifier();
 
     if (errors.length > 0) {
@@ -105,19 +157,29 @@ async function main() {
         targetId: setting.targetId,
         title,
         weekNumber,
+        studentName: result.studentName,
+        homeworkId: result.homeworkId,
+        notionUrl: page.url,
         result: '却下',
         reason: errors.join('; '),
       });
-      await notifier.sendRejected(result, setting, errors);
+      existingLogs.push([studentId, '', '', '', '', reasonStr]);
+      result.weekNumber = weekNumber;
+      if (!skipNotify) await notifier.sendRejected(result, setting, errors);
+      else console.log('  (非通知時間のため通知スキップ)');
     } else {
       console.log('→ 受理: 条件を満たしています');
       await sheets.appendLog(config.MANAGEMENT_SPREADSHEET_ID, {
         targetId: setting.targetId,
         title,
         weekNumber,
+        studentName: result.studentName,
+        homeworkId: result.homeworkId,
+        notionUrl: page.url,
         result: '受理',
         reason: '正常',
       });
+      existingLogs.push([studentId, '', '', '', '', reasonStr]);
 
       if (setting.notes === '本科' && config.ACADEMIC_SPREADSHEET_ID) {
         console.log('  教員FBシートへ書き込み...');
@@ -128,7 +190,8 @@ async function main() {
         }
       }
 
-      await notifier.sendAccepted(result, setting);
+      if (!skipNotify) await notifier.sendAccepted(result, setting);
+      else console.log('  (非通知時間のため通知スキップ)');
     }
   }
 

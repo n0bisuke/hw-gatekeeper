@@ -6,8 +6,8 @@ permissions:
 
 on:
   schedule:
-    # 毎時5分と35分に実行（30分間隔）
-    - cron: '5,35 * * * *'
+    # 毎時5分と35分に実行（30分間隔, JST 2:00〜5:59はスキップ）
+    - cron: '5,35 0-16,21-23 * * *'
   workflow_dispatch:
     # 手動実行も可能
   push:
