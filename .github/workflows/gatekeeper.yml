@@ -5,8 +5,10 @@ permissions: {}
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    # 毎時5分と35分に実行（30分間隔）。提出後あまり待たずに結果が届くようにする。
+    - cron: '5,35 * * * *'
   workflow_dispatch:
+    # 手動実行も可能（GitHub UIから「Run workflow」ボタン）
 
 jobs:
   run:

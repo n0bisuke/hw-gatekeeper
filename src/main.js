@@ -82,7 +82,7 @@ async function main() {
       continue;
     }
 
-    console.log(`\n--- ${title} (${setting.targetId}, 第${weekNumber}週) ---`);
+    console.log(`\n--- ${displayTitle(title)} (${setting.targetId}, 第${weekNumber}週) ---`);
 
     // バリデーション
     const validator = new Validator(notion);
