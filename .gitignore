@@ -1,0 +1,39 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# 環境変数
+.env
+.env.local
+.env.*.local
+
+# サービスアカウントキーなどの認証情報
+*.json.key
+credentials.json
+service-account*.json
+
+# ログ
+logs/
+*.log
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+
+# IDE/エディタ
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# テストカバレッジ
+coverage/
+
+# 一時ファイル
+tmp/
+temp/
+*.tmp

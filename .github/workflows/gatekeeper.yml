@@ -1,0 +1,37 @@
+name: Gatekeeper Sync
+
+# 最小権限の原則
+permissions: {}
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - run: node index.js
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          MANAGEMENT_SPREADSHEET_ID: ${{ secrets.MANAGEMENT_SPREADSHEET_ID }}
+          ACADEMIC_SPREADSHEET_ID: ${{ secrets.ACADEMIC_SPREADSHEET_ID }}
