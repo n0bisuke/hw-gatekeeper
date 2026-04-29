@@ -2,7 +2,9 @@ const { google } = require('googleapis');
 
 class SheetsClient {
   constructor(keyJsonStr) {
-    const keyJson = JSON.parse(keyJsonStr);
+    // GitHub ActionsのSecretsにJSONを入れるとクォートが壊れる問題への対策
+    const sanitized = keyJsonStr.replace(/^['"]|['"]$/g, '');
+    const keyJson = JSON.parse(sanitized);
     const auth = new google.auth.GoogleAuth({
       credentials: keyJson,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
