@@ -1,26 +1,29 @@
 name: Gatekeeper Sync
 
-# 最小権限の原則
-permissions: {}
+# 最小権限の原則（keep-alive用にcontents: writeが必要）
+permissions:
+  contents: write
 
 on:
   schedule:
-    # 毎時5分と35分に実行（30分間隔）。提出後あまり待たずに結果が届くようにする。
+    # 毎時5分と35分に実行（30分間隔）
     - cron: '5,35 * * * *'
   workflow_dispatch:
-    # 手動実行も可能（GitHub UIから「Run workflow」ボタン）
+    # 手動実行も可能
+  push:
+    # push時も実行（デバッグ用）
+    branches:
+      - '**'
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -37,3 +40,22 @@ jobs:
           GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
           MANAGEMENT_SPREADSHEET_ID: ${{ secrets.MANAGEMENT_SPREADSHEET_ID }}
           ACADEMIC_SPREADSHEET_ID: ${{ secrets.ACADEMIC_SPREADSHEET_ID }}
+
+      # ⚠️ 60日ルール対策: 1日1回ファイルを更新してコミット
+      # GitHub Actionsはリポジトリに60日間コミットがないとcronを自動停止する
+      - name: Keep repository active
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LAST_PUSH_FILE=".last-activity"
+          TODAY=$(date +%Y-%m-%d)
+          if [ ! -f "$LAST_PUSH_FILE" ] || [ "$(cat $LAST_PUSH_FILE)" != "$TODAY" ]; then
+            echo "$TODAY" > "$LAST_PUSH_FILE"
+            git config user.name "gatekeeper-bot"
+            git config user.email "n0bisuke+gatekeeper-bot@users.noreply.github.com"
+            git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            git add "$LAST_PUSH_FILE"
+            git commit -m "chore: keep repository active [skip ci]"
+            git push
+          fi
