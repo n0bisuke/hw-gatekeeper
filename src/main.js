@@ -74,20 +74,7 @@ async function main() {
     const submissions = await notion.queryPendingSubmissions(activeTargetIds);
   console.log(`${submissions.length}件の対象データを取得しました。`);
 
-  // 教育運営スプレッドシート（目安スケジュール）は任意
-  let schedule = {};
-  let hasAcademicSheet = false;
-  if (config.ACADEMIC_SPREADSHEET_ID) {
-    try {
-      schedule = await sheets.getSchedule(config.ACADEMIC_SPREADSHEET_ID);
-      hasAcademicSheet = Object.keys(schedule).length > 0;
-    } catch (e) {
-      console.log('目安スケジュールの読み込みに失敗（スキップ）:', e.message?.substring(0, 80));
-    }
-  }
-  const scheduler = new Scheduler(settings, schedule);
-
-  // 3. 重複判定のため既存ログを読み込む
+  const scheduler = new Scheduler(settings);
   let existingLogs = [];
   try {
     existingLogs = await sheets.getRecentLogs(config.MANAGEMENT_SPREADSHEET_ID);
@@ -108,7 +95,15 @@ async function main() {
 
     // 対応する設定を特定
     const upperTitle = title.toUpperCase();
-    const setting = settings.find((s) => upperTitle.startsWith(s.targetId.toUpperCase()));
+    const setting = settings.find((s) => {
+      if (!upperTitle.startsWith(s.targetId.toUpperCase())) return false;
+      // 学生IDフィルタ: 設定に学生IDがある場合は学籍番号と照合
+      if (s.targetStudentId) {
+        const gakuseki = notion.getPropertyValue(page, '学籍番号', 'rollup');
+        return gakuseki === s.targetStudentId;
+      }
+      return true;
+    });
     if (!setting) continue;
 
     // 週番号を抽出
@@ -125,12 +120,10 @@ async function main() {
     const result = await validator.validate(page);
     const errors = [...(result.errors || [])];
 
-    // 窓口判定（教育運営シートがある場合のみ）
-    if (hasAcademicSheet) {
-      const windowResult = scheduler.isWithinWindow(setting.targetId, weekNumber);
-      if (!windowResult.valid) {
-        errors.push(windowResult.reason);
-      }
+    // 窓口判定
+    const windowResult = scheduler.isWithinWindow(setting.targetId);
+    if (!windowResult.valid) {
+      errors.push(windowResult.reason);
     }
 
     const studentId = makeStudentId(result);

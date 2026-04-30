@@ -63,6 +63,20 @@ class NotionClient {
         if (prop.formula.type === 'string') return prop.formula.string || '';
         if (prop.formula.type === 'number') return String(prop.formula.number ?? '');
         return '';
+      case 'rollup':
+        if (prop.rollup.type === 'array' && prop.rollup.array.length > 0) {
+          const first = prop.rollup.array[0];
+          if (first.type === 'formula') {
+            if (first.formula.type === 'string') return first.formula.string || '';
+            if (first.formula.type === 'number') return String(first.formula.number ?? '');
+          }
+          if (first.type === 'title') return first.title?.map((t) => t.plain_text).join('') || '';
+          if (first.type === 'rich_text') return first.rich_text?.map((t) => t.plain_text).join('') || '';
+          if (first.type === 'number') return String(first.number ?? '');
+        }
+        if (prop.rollup.type === 'number') return String(prop.rollup.number ?? '');
+        if (prop.rollup.type === 'string') return prop.rollup.string || '';
+        return '';
       default:
         return null;
     }

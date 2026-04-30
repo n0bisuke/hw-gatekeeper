@@ -15,41 +15,27 @@ class SheetsClient {
   async getSettings(spreadsheetId) {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: '設定!A2:N100',
+      range: '設定!A2:Q100',
     });
     const rows = res.data.values || [];
     return rows.map((r, i) => ({
       targetId: r[0]?.trim(),
-      deadlineWeekday: r[1]?.trim(),
-      deadlineTime: r[2]?.trim(),
-      unlockWeekday: r[3]?.trim(),
-      unlockTime: r[4]?.trim(),
-      discordWebhook: r[5]?.trim(),
-      discordThread: r[6]?.trim(),
-      teamsWebhook: r[7]?.trim(),
-      quietHours: r[8]?.trim(),
-      operationLimit: r[9]?.trim(),
-      transferSheetId: r[10]?.trim(),
-      transferTabName: r[11]?.trim(),
-      notes: r[12]?.trim(),
-      rowIndex: i + 2, // ヘッダー行が1行目なので、データは2行目から
+      targetStudentId: r[1]?.trim(),
+      deadlineWeekday: r[2]?.trim(),
+      deadlineTime: r[3]?.trim(),
+      unlockWeekday: r[4]?.trim(),
+      unlockTime: r[5]?.trim(),
+      discordWebhook: r[6]?.trim(),
+      discordThread: r[7]?.trim(),
+      teamsWebhook: r[8]?.trim(),
+      acceptPrefix: r[9]?.trim(),
+      rejectPrefix: r[10]?.trim(),
+      quietHours: r[11]?.trim(),
+      operationLimit: r[12]?.trim(),
+      transferSheetId: r[13]?.trim(),
+      transferTabName: r[14]?.trim(),
+      rowIndex: i + 2,
     }));
-  }
-
-  async getSchedule(spreadsheetId) {
-    const res = await this.sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: '目安スケジュール!A2:C100',
-    });
-    const rows = res.data.values || [];
-    const schedule = {};
-    rows.forEach((r) => {
-      const week = parseInt(r[0], 10);
-      if (!isNaN(week) && r[2]) {
-        schedule[week] = new Date(r[2]);
-      }
-    });
-    return schedule;
   }
 
   async appendLog(spreadsheetId, entry) {
@@ -103,7 +89,7 @@ class SheetsClient {
   async updateLastActive(spreadsheetId, rowIndex) {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `設定!N${rowIndex}`,
+      range: `設定!P${rowIndex}`,
       valueInputOption: 'RAW',
       requestBody: {
         values: [[this._now()]],
@@ -114,7 +100,7 @@ class SheetsClient {
   async updateSystemActive(spreadsheetId) {
     await this.sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: '設定!N1',
+      range: '設定!P1',
       valueInputOption: 'RAW',
       requestBody: {
         values: [[`最終稼働: ${this._now()}`]],

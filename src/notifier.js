@@ -8,14 +8,14 @@ class Notifier {
   }
 
   async sendAccepted(result, setting) {
-    const lines = [
-      `✅ **受理: ${result.title}**`,
-      '',
-      `学生: ${result.studentName || '(不明)'}`,
-      `課題: ${result.homeworkId || '(不明)'}`,
-      `Notion: ${result.notionUrl}`,
-      `提出週: 第${result.weekNumber}週`,
-    ];
+    const lines = [];
+    if (setting.acceptPrefix) lines.push(setting.acceptPrefix);
+    lines.push(`✅ **受理: ${result.title}**`);
+    lines.push('');
+    lines.push(`学生: ${result.studentName || '(不明)'}`);
+    lines.push(`課題: ${result.homeworkId || '(不明)'}`);
+    lines.push(`Notion: ${result.notionUrl}`);
+    lines.push(`提出週: 第${result.weekNumber}週`);
     if (result.doUrl) lines.push(`Do: ${result.doUrl}`);
     lines.push(`受理時刻: ${new Date().toLocaleString('ja-JP')}`);
     const message = lines.join('\n');
@@ -25,14 +25,14 @@ class Notifier {
 
   async sendRejected(result, setting, reasons) {
     const reasonText = Array.isArray(reasons) ? reasons.join('\n') : reasons;
-    const lines = [
-      `❌ **却下: ${result.title}**`,
-      '',
-      `学生: ${result.studentName || '(不明)'}`,
-      `課題: ${result.homeworkId || '(不明)'}`,
-      `Notion: ${result.notionUrl}`,
-      `提出週: 第${result.weekNumber}週`,
-    ];
+    const lines = [];
+    if (setting.rejectPrefix) lines.push(setting.rejectPrefix);
+    lines.push(`❌ **却下: ${result.title}**`);
+    lines.push('');
+    lines.push(`学生: ${result.studentName || '(不明)'}`);
+    lines.push(`課題: ${result.homeworkId || '(不明)'}`);
+    lines.push(`Notion: ${result.notionUrl}`);
+    lines.push(`提出週: 第${result.weekNumber}週`);
     if (result.doUrl) lines.push(`Do: ${result.doUrl}`);
     if (result.plan && reasonText.includes('Plan')) {
       lines.push(`Plan内容:\n${result.plan}`);
@@ -59,7 +59,6 @@ class Notifier {
 
   _sendDiscord(content, webhookUrl, threadUrl) {
     return new Promise((resolve, reject) => {
-      // threadUrlが/channels/形式の場合、そこからthread_idを抽出
       let url = webhookUrl;
       if (threadUrl) {
         const threadMatch = threadUrl.match(/\/channels\/\d+\/(\d+)/);
