@@ -21,6 +21,7 @@ class Validator {
     const doUrl = this.notion.getPropertyValue(page, PROP_DO, 'url');
     const studentName = this.notion.getPropertyValue(page, '学生名（確認用）', 'formula');
     const homeworkId = this.notion.getPropertyValue(page, '課題ID(外部参照用)', 'formula');
+    const category = this.notion.getPropertyValue(page, 'カテゴリ(自動化用)', 'formula');
 
     if (!studentName || studentName === '_') {
       errors.push('「学生名」が未入力です');
@@ -62,6 +63,7 @@ class Validator {
       plan: plan || '',
       studentName: studentName || '',
       homeworkId: homeworkId || '',
+      category: category || '',
       errors,
       valid: errors.length === 0,
     };

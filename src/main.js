@@ -65,14 +65,13 @@ async function main() {
 
   const activeTargetIds = activeSettings.map((s) => s.targetId);
   if (activeTargetIds.length === 0) {
-    console.log('有効なターゲットがありません。処理を終了します。');
-    return;
-  }
-  console.log(`有効ターゲット: ${mask(activeTargetIds.join(', '))}`);
+    console.log('有効なターゲットがありません。宿題チェックをスキップします。');
+  } else {
+    console.log(`有効ターゲット: ${mask(activeTargetIds.join(', '))}`);
 
-  // 2. 該当ターゲットIDの提出のみをNotionから取得
-  console.log('Notionから提出済みデータを取得中...');
-  const submissions = await notion.queryPendingSubmissions(activeTargetIds);
+    // 2. 該当ターゲットIDの提出のみをNotionから取得
+    console.log('Notionから提出済みデータを取得中...');
+    const submissions = await notion.queryPendingSubmissions(activeTargetIds);
   console.log(`${submissions.length}件の対象データを取得しました。`);
 
   // 教育運営スプレッドシート（目安スケジュール）は任意
@@ -162,6 +161,7 @@ async function main() {
         notionUrl: page.url,
         result: '却下',
         reason: errors.join('; '),
+        transferred: '未実施',
       });
       existingLogs.push([studentId, '', '', '', '', reasonStr]);
       result.weekNumber = weekNumber;
@@ -169,6 +169,26 @@ async function main() {
       else console.log('  (非通知時間のため通知スキップ)');
     } else {
       console.log('→ 受理: 条件を満たしています');
+
+      // 転記先シートへ書き込み
+      let transferred = '未実施';
+      if (setting.transferSheetId && setting.transferTabName) {
+        try {
+          await sheets.transferToSheet(setting.transferSheetId, setting.transferTabName, {
+            studentName: result.studentName,
+            homeworkId: result.homeworkId,
+            targetId: setting.targetId,
+            category: result.category,
+            result: '受理',
+            notionUrl: page.url,
+          });
+          transferred = '済';
+          console.log('  転記先シートへ書き込み完了');
+        } catch (e) {
+          console.error('  転記先シート書き込み失敗:', e.message?.substring(0, 80));
+        }
+      }
+
       await sheets.appendLog(config.MANAGEMENT_SPREADSHEET_ID, {
         targetId: setting.targetId,
         title,
@@ -178,20 +198,29 @@ async function main() {
         notionUrl: page.url,
         result: '受理',
         reason: '正常',
+        transferred,
       });
       existingLogs.push([studentId, '', '', '', '', reasonStr]);
 
-      if (setting.notes === '本科' && config.ACADEMIC_SPREADSHEET_ID) {
-        console.log('  教員FBシートへ書き込み...');
-        try {
-          await sheets.appendFeedback(config.ACADEMIC_SPREADSHEET_ID, weekNumber, page.url);
-        } catch (e) {
-          console.error('  教員FBシート書き込み失敗:', e.message?.substring(0, 80));
-        }
-      }
-
       if (!skipNotify) await notifier.sendAccepted(result, setting);
       else console.log('  (非通知時間のため通知スキップ)');
+    }
+  } // end of for loop
+  } // end else
+
+  // ヘルスチェック: システム稼働時刻をN1に更新（毎回）
+  try {
+    await sheets.updateSystemActive(config.MANAGEMENT_SPREADSHEET_ID);
+  } catch (e) {
+    console.error('システム稼働更新失敗:', e.message?.substring(0, 80));
+  }
+
+  // 各ターゲットの最終稼働時刻を更新（実際に処理されたターゲットのみ）
+  for (const s of activeSettings) {
+    try {
+      await sheets.updateLastActive(config.MANAGEMENT_SPREADSHEET_ID, s.rowIndex);
+    } catch (e) {
+      console.error(`最終稼働更新失敗 (${s.targetId}):`, e.message?.substring(0, 80));
     }
   }
 

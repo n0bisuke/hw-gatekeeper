@@ -15,10 +15,10 @@ class SheetsClient {
   async getSettings(spreadsheetId) {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: '設定!A2:K100',
+      range: '設定!A2:N100',
     });
     const rows = res.data.values || [];
-    return rows.map((r) => ({
+    return rows.map((r, i) => ({
       targetId: r[0]?.trim(),
       deadlineWeekday: r[1]?.trim(),
       deadlineTime: r[2]?.trim(),
@@ -29,7 +29,10 @@ class SheetsClient {
       teamsWebhook: r[7]?.trim(),
       quietHours: r[8]?.trim(),
       operationLimit: r[9]?.trim(),
-      notes: r[10]?.trim(),
+      transferSheetId: r[10]?.trim(),
+      transferTabName: r[11]?.trim(),
+      notes: r[12]?.trim(),
+      rowIndex: i + 2, // ヘッダー行が1行目なので、データは2行目から
     }));
   }
 
@@ -53,7 +56,7 @@ class SheetsClient {
     const studentId = [entry.studentName, entry.homeworkId].filter(Boolean).join('_');
     await this.sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'ログ!A:G',
+      range: 'ログ!A:H',
       valueInputOption: 'RAW',
       requestBody: {
         values: [[
@@ -64,6 +67,7 @@ class SheetsClient {
           entry.result,
           entry.reason,
           entry.notionUrl || '',
+          entry.transferred || '未実施',
         ]],
       },
     });
@@ -72,9 +76,50 @@ class SheetsClient {
   async getRecentLogs(spreadsheetId) {
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'ログ!A:G',
+      range: 'ログ!A:H',
     });
     return (res.data.values || []).slice(1); // ヘッダー行を除く
+  }
+
+  async transferToSheet(spreadsheetId, tabName, entry) {
+    const studentId = [entry.studentName, entry.homeworkId].filter(Boolean).join('_');
+    await this.sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: `${tabName}!A:F`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[
+          studentId,
+          this._now(),
+          entry.targetId,
+          entry.category || '',
+          entry.result,
+          entry.notionUrl || '',
+        ]],
+      },
+    });
+  }
+
+  async updateLastActive(spreadsheetId, rowIndex) {
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `設定!N${rowIndex}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[this._now()]],
+      },
+    });
+  }
+
+  async updateSystemActive(spreadsheetId) {
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: '設定!N1',
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[`最終稼働: ${this._now()}`]],
+      },
+    });
   }
 
   async appendFeedback(spreadsheetId, week, notionUrl) {
