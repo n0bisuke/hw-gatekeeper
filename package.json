@@ -21,8 +21,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@notionhq/client": "2.3.0",
+    "@notionhq/client": "5.20.0",
     "dayjs": "^1.11.13",
-    "googleapis": "140.0.1"
+    "googleapis": "171.4.0"
   }
 }

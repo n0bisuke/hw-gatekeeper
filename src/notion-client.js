@@ -4,6 +4,14 @@ class NotionClient {
   constructor(token, databaseId) {
     this.client = new Client({ auth: token });
     this.databaseId = databaseId;
+    this._dataSourceId = null;
+  }
+
+  async _getDataSourceId() {
+    if (this._dataSourceId) return this._dataSourceId;
+    const db = await this.client.databases.retrieve({ database_id: this.databaseId });
+    this._dataSourceId = db.data_sources[0].id;
+    return this._dataSourceId;
   }
 
   async queryPendingSubmissions(targetIds) {
@@ -12,8 +20,9 @@ class NotionClient {
       title: { contains: id },
     }));
 
-    const response = await this.client.databases.query({
-      database_id: this.databaseId,
+    const dataSourceId = await this._getDataSourceId();
+    const response = await this.client.dataSources.query({
+      data_source_id: dataSourceId,
       filter: {
         and: [
           {

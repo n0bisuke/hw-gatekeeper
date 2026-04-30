@@ -33,6 +33,8 @@ jobs:
       - run: npm audit --audit-level=moderate
         continue-on-error: true
 
+      - run: npm audit signatures
+
       - run: node index.js
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
