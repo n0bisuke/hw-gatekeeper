@@ -52,10 +52,10 @@ jobs:
       - name: Prepare secrets
         run: |
           mkdir -p /tmp/gatekeeper
-          echo "${{ secrets.NOTION_TOKEN }}" > /tmp/gatekeeper/notion_token
-          echo "${{ secrets.NOTION_DATABASE_ID }}" > /tmp/gatekeeper/notion_database_id
-          echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}" > /tmp/gatekeeper/google_key
-          echo "${{ secrets.MANAGEMENT_SPREADSHEET_ID }}" > /tmp/gatekeeper/management_spreadsheet_id
+          echo "${{ secrets.NOTION_TOKEN }}" > /tmp/gatekeeper/NOTION_TOKEN
+          echo "${{ secrets.NOTION_DATABASE_ID }}" > /tmp/gatekeeper/NOTION_DATABASE_ID
+          echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}" > /tmp/gatekeeper/GOOGLE_SERVICE_ACCOUNT_KEY
+          echo "${{ secrets.MANAGEMENT_SPREADSHEET_ID }}" > /tmp/gatekeeper/MANAGEMENT_SPREADSHEET_ID
           chmod 600 /tmp/gatekeeper/*
 
       - name: Run gatekeeper
