@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@notionhq/client": "5.20.0",
-    "dayjs": "^1.11.13",
+    "dayjs": "^1.11.21",
     "googleapis": "171.4.0"
   }
 }
